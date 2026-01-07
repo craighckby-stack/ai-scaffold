@@ -15,7 +15,7 @@ class Logger {
         line.className = `log-line log-${type.toLowerCase()}`;
         line.textContent = msg;
         this.el.prepend(line);
-        while (this.el.children.length > 50) {
+        if (this.el.children.length > 50) {
             this.el.lastChild.remove();
         }
     }
@@ -38,8 +38,10 @@ class GitHubClient {
         }
     }
     async _fetch(endpoint, options = {}) {
-        const mergedHeaders = { ...this.defaultHeaders, ...options.headers };
-        const response = await fetch(`${this.baseURL}${endpoint}`, { ...options, headers: mergedHeaders });
+        const response = await fetch(`${this.baseURL}${endpoint}`, {
+            ...options,
+            headers: { ...this.defaultHeaders, ...options.headers }
+        });
         if (response.status === 204) return null;
         if (!response.ok) {
             const errorBody = await response.json().catch(() => ({}));
@@ -66,7 +68,7 @@ class GitHubClient {
     async getFileContent(filePath, branch) {
         this.logger.log(`Reading file: ${filePath}`);
         const data = await this._fetch(`/contents/${filePath}?ref=${branch}`);
-        return atob(data.content.replace(/\s+/g, ''));
+        return atob(data.content.replace(/\s/g, ''));
     }
     async commitChanges(branchName, commitMessage, filesToUpdate) {
         this.logger.log(`Preparing commit for ${filesToUpdate.length} files...`);
@@ -215,11 +217,15 @@ class EvolutionEngine {
                     item.size < this.config.MAX_FILE_SIZE
                 ).map(item => item.path);
                 this.logger.log(`Found ${filesToAnalyze.length} files for analysis.`);
-                const fileContents = {};
-                await Promise.all(filesToAnalyze.map(async (path) => {
-                    fileContents[path] = await this.github.getFileContent(path, evolutionBranch);
-                }));
+                
+                const fileContents = await filesToAnalyze.reduce(async (accPromise, path) => {
+                    const acc = await accPromise;
+                    acc[path] = await this.github.getFileContent(path, evolutionBranch);
+                    return acc;
+                }, Promise.resolve({}));
+
                 const updates = await this.gemini.analyzeAndGenerateCode(fileContents);
+                
                 if (updates.length === 0) {
                      this.logger.warn("AI returned no modifications. Ending evolution early.");
                      return;
