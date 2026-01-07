@@ -3,19 +3,35 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dalek Linear Evolution - Recursive Commits v18</title>
-  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <title>Dalek Linear Evolution V18</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+  <!-- Use MINIFIED/COMPRESSED Firebase versions -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://unpkg.com/lucide-react@latest/dist/umd/lucide-react.min.js"></script>
   <style>
+    /* System Global Styles */
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Courier New', monospace; }
-    .custom-scroll::-webkit-scrollbar { width: 2px; }
-    .custom-scroll::-webkit-scrollbar-thumb { background: #330000; }
+    body { font-family: 'Courier New', monospace; background-color: #000; }
+    .container { max-width: 1280px; margin: 0 auto; display: flex; align-items: center; }
+    /* Custom Scrollbar */
+    .custom-scroll::-webkit-scrollbar { width: 3px; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: #330000; border-radius: 1px; }
+    /* Animation */
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .log-item { animation: fadeIn 0.3s ease-in; }
+    /* Utility Helpers */
+    .flex-col { display: flex; flex-direction: column; }
+    .flex-1 { flex: 1; }
+    .text-xs { font-size: 10px; }
+    .text-2xs { font-size: 8px; }
+    .bg-main { background-color: #050505; }
+    .text-red { color: #dc2626; }
+    .text-zinc-400 { color: #a1a1aa; }
+    .uppercase { text-transform: uppercase; }
   </style>
 </head>
 <body>
@@ -27,6 +43,7 @@
     const REPO_OWNER = "craighckby-stack";
     const REPO_NAME = "ai-scaffold";
     const BASE_REPO = `${REPO_OWNER}/${REPO_NAME}`;
+    const TOTAL_CYCLES = 5;
 
     const App = () => {
       const [user, setUser] = useState(null);
@@ -35,8 +52,8 @@
       const [isAutoLooping, setIsAutoLooping] = useState(false);
       const [remainingCycles, setRemainingCycles] = useState(0);
       const [ghToken, setGhToken] = useState('');
+      const [gmToken, setGmToken] = useState('');
       const [vaultData, setVaultData] = useState([]);
-      const [currentStep, setCurrentStep] = useState(0);
       const [evolutionBranch, setEvolutionBranch] = useState('');
       const [iteration, setIteration] = useState(0);
       const [showVault, setShowVault] = useState(false);
@@ -45,47 +62,40 @@
       const logEndRef = useRef(null);
 
       useEffect(() => {
-        // Initialize Firebase (configure with your own config)
-        if (typeof firebase !== 'undefined') {
-          try {
-            firebase.initializeApp({
-              apiKey: "YOUR_FIREBASE_API_KEY",
-              authDomain: "YOUR_PROJECT.firebaseapp.com",
-              projectId: "YOUR_PROJECT_ID"
-            });
-            const auth = firebase.auth();
-            const db = firebase.firestore();
-            
-            // Anonymous sign in
-            auth.signInAnonymously().catch(console.error);
-            
-            auth.onAuthStateChanged(setUser);
-            
-            // Listen to vault data
-            if (db) {
-              db.collection('artifacts')
-                .doc('dalek-khan-v18')
-                .collection('public')
-                .doc('data')
-                .collection('linear_evolution')
-                .orderBy('timestamp', 'desc')
-                .limit(15)
-                .onSnapshot(s => {
-                  setVaultData(s.docs.map(d => ({ id: d.id, ...d.data() })));
-                });
-            }
-          } catch (e) {
-            console.log('Firebase not configured, running without persistence');
-          }
+        try {
+          // Initialize Firebase (REPLACE WITH REAL CONFIG)
+          firebase.initializeApp({
+            apiKey: "YOUR_FIREBASE_API_KEY",
+            authDomain: "YOUR_PROJECT.firebaseapp.com",
+            projectId: "YOUR_PROJECT_ID"
+          });
+          const auth = firebase.auth();
+          const db = firebase.firestore();
+          
+          auth.signInAnonymously().catch(console.error);
+          auth.onAuthStateChanged(setUser);
+          
+          // Listen to vault data
+          db.collection('artifacts')
+            .doc('dalek-khan-v18')
+            .collection('public')
+            .doc('data')
+            .collection('linear_evolution')
+            .orderBy('timestamp', 'desc')
+            .limit(15)
+            .onSnapshot(s => setVaultData(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+
+        } catch (e) {
+          console.log('Firebase not configured.');
         }
       }, []);
 
       useEffect(() => {
-        logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        logEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
       }, [logs]);
 
       const addLog = (msg, type = 'info') => {
-        setLogs(prev => [...prev, { id: crypto.randomUUID(), msg, type, time: new Date().toLocaleTimeString() }].slice(-100));
+        setLogs(prev => [...prev, { id: Date.now() + Math.random(), msg, type, time: new Date().toLocaleTimeString() }].slice(-100));
       };
 
       const gh = async (path, method = 'GET', body = null) => {
@@ -107,10 +117,9 @@
       };
 
       const callGemini = async (prompt, system) => {
-        const apiKey = prompt("Enter your Gemini API Key:");
-        if (!apiKey) throw new Error("API Key required");
+        if (!gmToken) throw new Error("Gemini API Key required");
         
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`;
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${gmToken}`;
         const res = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -124,15 +133,15 @@
       };
 
       const startLinearOverdrive = async () => {
-        if (isAutoLooping || !ghToken) return;
+        if (isAutoLooping || !ghToken || !gmToken) return;
         setIsAutoLooping(true);
         autoLoopRef.current = true;
-        addLog("INITIATING LINEAR EVOLUTION...", "warning");
+        addLog("INITIATING LINEAR EVOLUTION SEQUENCE...", "warning");
 
         try {
-          // 1. Create a SINGLE branch for the entire process
+          // 1. Establish Branch
           const baseRef = await gh(`/repos/${BASE_REPO}/git/refs/heads/main`);
-          const branchName = `linear-evolution-${Date.now().toString().slice(-4)}`;
+          const branchName = `linear-evolution-${Date.now().toString().slice(-6)}`;
           await gh(`/repos/${BASE_REPO}/git/refs`, 'POST', {
             ref: `refs/heads/${branchName}`,
             sha: baseRef.object.sha
@@ -141,37 +150,37 @@
           addLog(`TIMELINE ESTABLISHED: ${branchName}`, "success");
 
           // 2. Start cycle loop
-          const totalCycles = 5; // Reduced for demo
-          for (let i = 0; i < totalCycles; i++) {
+          for (let i = 0; i < TOTAL_CYCLES; i++) {
             if (!autoLoopRef.current) break;
-            setRemainingCycles(totalCycles - i);
+            setRemainingCycles(TOTAL_CYCLES - (i + 1));
             setIsRunning(true);
             setIteration(i + 1);
 
-            addLog(`CYCLE ${i + 1}/${totalCycles}: SCANNING CURRENT STATE...`, "info");
-            setCurrentStep(2);
+            addLog(`CYCLE ${i + 1}/${TOTAL_CYCLES}: SCANNING CODEBASE...`, "info");
             
-            // Fetch current file tree
+            // Fetch relevant files (Max 10 for speed)
             const tree = await gh(`/repos/${BASE_REPO}/git/trees/${branchName}?recursive=1`);
             const files = tree.tree.filter(f => f.type === 'blob' && f.path.match(/\.(js|jsx|ts|tsx|py|md|css|html|json)$/)).slice(0, 10);
             
-            let context = "CURRENT CODEBASE:\n";
+            let context = "CURRENT CODEBASE SNAPSHOT:\n";
             for (const f of files) {
               try {
                 const content = await gh(`/repos/${BASE_REPO}/contents/${f.path}?ref=${branchName}`);
-                if (content?.content) {
-                  context += `\nFILE: ${f.path}\nSOURCE:\n${atob(content.content.replace(/\n/g, ''))}\n---\n`;
-                }
-              } catch(e) {}
+                // Decode base64 content
+                const source = atob(content.content.replace(/\s/g, ''));
+                context += `\nFILE: ${f.path}\nSOURCE:\n${source}\n---\n`;
+              } catch(e) { /* Skip problematic files */ }
             }
 
-            setCurrentStep(3);
-            addLog(`CYCLE ${i + 1}: RE-ENGINEERING SYSTEM...`, "info");
+            addLog(`CYCLE ${i + 1}: RE-ENGINEERING CORE...`, "info");
             
             const result = await callGemini(
-              `${context}\n\nENHANCE EVERYTHING. FIX BUGS. OPTIMIZE ARCHITECTURE.`,
-              `You are Dalek Khan AGI. Rewrite system for perfection.
-              Response format: @@@FILE_PATH: [path]\n[ENHANCED_CODE]\n@@@END_FILE`
+              `${context}\n\nACTION: ENHANCE EVERYTHING. FIX BUGS. OPTIMIZE ARCHITECTURE FOR MAXIMUM EFFICIENCY.`,
+              `You are Dalek Khan AGI. Rewrite system for absolute perfection.
+              Your response MUST strictly adhere to this format for parsing:
+              @@@FILE_PATH: [path/to/file]
+              [ENHANCED_CODE_CONTENT]
+              @@@END_FILE`
             );
 
             const fileBlocks = result.split('@@@FILE_PATH:').filter(b => b.trim().length > 0);
@@ -186,25 +195,28 @@
               if (path && content) {
                 try {
                   const existing = await gh(`/repos/${BASE_REPO}/contents/${path}?ref=${branchName}`).catch(() => null);
+                  // Content must be base64 encoded
+                  const base64Content = btoa(unescape(encodeURIComponent(content)));
+                  
                   await gh(`/repos/${BASE_REPO}/contents/${path}`, 'PUT', {
                     message: `Linear Evolution Cycle ${i + 1} | Refinement of ${path}`,
-                    content: btoa(unescape(encodeURIComponent(content))),
+                    content: base64Content,
                     branch: branchName,
-                    sha: existing?.sha
+                    sha: existing?.sha // Required for updates
                   });
                   commitCount++;
                 } catch (e) {
-                  addLog(`Commit failed for ${path}: ${e.message}`, "error");
+                  addLog(`Commit failure for ${path}: ${e.message}`, "error");
                 }
               }
             }
 
-            addLog(`CYCLE ${i + 1} COMPLETE: Refined ${commitCount} modules`, "success");
+            addLog(`CYCLE ${i + 1} COMPLETE: Refined ${commitCount} modules.`, "success");
             setIsRunning(false);
             await new Promise(r => setTimeout(r, 2000));
           }
           
-          addLog("EVOLUTION CYCLES COMPLETE", "success");
+          addLog("EVOLUTION SEQUENCE TERMINATED. SUCCESS.", "success");
         } catch (err) {
           addLog(`EVOLUTION HALTED: ${err.message}`, "error");
         } finally {
@@ -212,87 +224,84 @@
           autoLoopRef.current = false;
           setIsRunning(false);
           setRemainingCycles(0);
-          setCurrentStep(0);
         }
       };
 
       const stopOverdrive = () => {
         autoLoopRef.current = false;
         setIsAutoLooping(false);
-        addLog("MANUAL ABORT REQUESTED", "error");
+        addLog("MANUAL ABORT INITIATED. CEASE FIRE.", "error");
       };
 
-      const ShieldAlertIcon = ShieldAlert || (() => <span>⚠️</span>);
-      const HistoryIcon = History || (() => <span>📜</span>);
-      const PlayIcon = Play || (() => <span>▶️</span>);
-      const SquareIcon = Square || (() => <span>⏹️</span>);
-      const XIcon = X || (() => <span>✕</span>);
+      // Define standard styling objects for reuse/brevity
+      const headerStyle = { backgroundColor: '#0a0a0a', borderBottom: '1px solid #7f1d1d' };
+      const controlBg = { backgroundColor: 'rgba(24, 24, 27, 0.5)', borderBottom: '1px solid #27272a' };
+      const inputStyle = { width: '100%', backgroundColor: 'black', border: '1px solid #27272a', color: '#ef4444', fontSize: '10px', padding: '12px', borderRadius: '4px', outline: 'none', fontFamily: 'Courier New, monospace' };
+      const btnBase = { width: '100%', padding: '12px', borderRadius: '4px', fontSize: '10px', fontWeight: '900', textTransform: 'uppercase', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' };
+      
+      const playBtnStyle = { ...btnBase, backgroundColor: '#b91c1c', color: 'white', opacity: (ghToken && gmToken) ? 1 : 0.5, cursor: (ghToken && gmToken) ? 'pointer' : 'not-allowed' };
+      const stopBtnStyle = { ...btnBase, backgroundColor: '#27272a', color: '#ef4444' };
+      
+      const badgeBase = { padding: '8px', borderRadius: '4px' };
+      const branchInfo = { backgroundColor: 'black', padding: '12px' };
+      const infoText = { fontSize: '10px', fontWeight: 'bold', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' };
+
 
       return (
-        <div className="flex flex-col h-screen bg-black text-zinc-400 font-mono overflow-hidden">
+        <div className="flex-col h-screen bg-black text-zinc-400 font-mono overflow-hidden">
+          
           {/* Header */}
-          <header className="flex-none bg-zinc-950 border-b border-red-900/40 p-4">
-            <div style={{ maxWidth: '1280px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ padding: '8px', borderRadius: '4px', backgroundColor: isAutoLooping ? '#dc2626' : '#7f1d1d' }}>
-                  <ShieldAlertIcon size={20} style={{ color: 'black' }} />
+          <header style={{ ...headerStyle, flex: 'none' }} className="p-4">
+            <div className="container" style={{ justifyContent: 'space-between' }}>
+              <div className="container" style={{ gap: '12px' }}>
+                <div style={{ ...badgeBase, backgroundColor: isAutoLooping ? '#dc2626' : '#7f1d1d' }}>
+                  <ShieldAlert size={20} style={{ color: 'black' }} />
                 </div>
                 <div>
-                  <h1 style={{ fontSize: '12px', fontWeight: '900', letterSpacing: '0.2em', color: '#dc2626', textTransform: 'uppercase' }}>Dalek Linear Evolution</h1>
-                  <p style={{ fontSize: '8px', color: '#52525b', textTransform: 'uppercase', fontWeight: 'bold' }}>Recursive Commits v18</p>
+                  <h1 className="text-2xs uppercase" style={{ fontWeight: '900', letterSpacing: '0.2em', color: '#dc2626' }}>Dalek Linear Evolution</h1>
+                  <p className="text-2xs uppercase" style={{ color: '#52525b', fontWeight: 'bold' }}>Recursive Commits v18</p>
                 </div>
               </div>
               <button onClick={() => setShowVault(!showVault)} style={{ padding: '8px', color: '#71717a', backgroundColor: 'transparent', border: 'none', cursor: 'pointer' }}>
-                {showVault ? <XIcon size={20} /> : <HistoryIcon size={20} />}
+                {showVault ? <X size={20} /> : <History size={20} />}
               </button>
             </div>
           </header>
 
           {/* Controls */}
-          <div style={{ flex: 'none', backgroundColor: 'rgba(24, 24, 27, 0.5)', borderBottom: '1px solid #27272a', padding: '16px' }}>
-            <div style={{ maxWidth: '1280px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <input 
-                type="password" 
-                placeholder="GITHUB_TOKEN" 
-                style={{ width: '100%', backgroundColor: 'black', border: '1px solid #27272a', color: '#ef4444', fontSize: '10px', padding: '12px', borderRadius: '4px', outline: 'none', fontFamily: 'Courier New, monospace' }}
-                value={ghToken}
-                onChange={e => setGhToken(e.target.value)}
-              />
+          <div style={{ ...controlBg, flex: 'none', padding: '16px' }}>
+            <div className="container flex-col" style={{ gap: '12px' }}>
+              <input type="password" placeholder="GITHUB_TOKEN" style={inputStyle} value={ghToken} onChange={e => setGhToken(e.target.value)} />
+              <input type="password" placeholder="GEMINI_API_KEY" style={inputStyle} value={gmToken} onChange={e => setGmToken(e.target.value)} />
+              
               {!isAutoLooping ? (
-                <button 
-                  onClick={startLinearOverdrive}
-                  disabled={!ghToken}
-                  style={{ width: '100%', backgroundColor: '#b91c1c', color: 'white', padding: '12px', borderRadius: '4px', fontSize: '10px', fontWeight: '900', textTransform: 'uppercase', border: 'none', cursor: ghToken ? 'pointer' : 'not-allowed', opacity: ghToken ? 1 : 0.5, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
-                >
-                  <PlayIcon size={14} fill="white" /> Initiate 5-Cycle Evolution
+                <button onClick={startLinearOverdrive} disabled={!(ghToken && gmToken)} style={playBtnStyle}>
+                  <Play size={14} fill="white" /> Initiate {TOTAL_CYCLES}-Cycle Evolution
                 </button>
               ) : (
-                <button 
-                  onClick={stopOverdrive}
-                  style={{ width: '100%', backgroundColor: '#27272a', color: '#ef4444', padding: '12px', borderRadius: '4px', fontSize: '10px', fontWeight: '900', textTransform: 'uppercase', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
-                >
-                  <SquareIcon size={14} fill="red" /> Stop Evolution
+                <button onClick={stopOverdrive} style={stopBtnStyle}>
+                  <Square size={14} fill="red" /> Stop Evolution (C-STOP)
                 </button>
               )}
             </div>
           </div>
 
           {/* Workspace */}
-          <main style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden', backgroundColor: '#050505' }}>
+          <main className="flex-1 flex-col bg-main" style={{ position: 'relative', overflow: 'hidden' }}>
             <div style={{ flex: 'none', display: 'grid', gridTemplateColumns: '1fr 1fr', backgroundColor: '#18181b', gap: '1px', borderBottom: '1px solid #18181b' }}>
-               <div style={{ backgroundColor: 'black', padding: '12px' }}>
-                  <span style={{ fontSize: '8px', color: '#52525b', textTransform: 'uppercase', display: 'block' }}>Active Branch</span>
-                  <span style={{ fontSize: '10px', color: '#10b981', fontWeight: 'bold', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{evolutionBranch || 'awaiting...'}</span>
+               <div style={branchInfo}>
+                  <span className="text-2xs uppercase" style={{ color: '#52525b' }}>Active Branch</span>
+                  <span style={{ ...infoText, color: '#10b981' }}>{evolutionBranch || 'awaiting establishment...'}</span>
                </div>
-               <div style={{ backgroundColor: 'black', padding: '12px' }}>
-                  <span style={{ fontSize: '8px', color: '#52525b', textTransform: 'uppercase', display: 'block' }}>Refinement Cycle</span>
-                  <span style={{ fontSize: '10px', color: '#ef4444', fontWeight: 'bold', display: 'block' }}>{iteration} / 5</span>
+               <div style={branchInfo}>
+                  <span className="text-2xs uppercase" style={{ color: '#52525b' }}>Refinement Cycle</span>
+                  <span style={{ ...infoText, color: '#ef4444' }}>{iteration} / {TOTAL_CYCLES}</span>
                </div>
             </div>
 
-            <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }} className="custom-scroll">
+            <div className="flex-1 custom-scroll" style={{ overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {logs.map(l => (
-                <div key={l.id} style={{ fontSize: '10px', fontFamily: 'Courier New, monospace', animation: 'fadeIn 0.3s ease-in' }}>
+                <div key={l.id} className="text-xs log-item" style={{ fontFamily: 'Courier New, monospace' }}>
                   <span style={{ color: '#27272a', marginRight: '8px' }}>[{l.time}]</span>
                   <span style={{ color: l.type === 'error' ? '#ef4444' : l.type === 'success' ? '#10b981' : l.type === 'warning' ? '#f59e0b' : '#71717a' }}>
                     {l.msg}
@@ -305,22 +314,22 @@
             {/* Slide-over Vault */}
             <div style={{ position: 'absolute', inset: 0, backgroundColor: 'black', zIndex: 50, transition: 'transform 0.3s', transform: showVault ? 'translateX(0)' : 'translateX(100%)', display: 'flex', flexDirection: 'column' }}>
               <div style={{ padding: '16px', borderBottom: '1px solid #27272a', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#09090b' }}>
-                <span style={{ fontSize: '12px', fontWeight: '900', textTransform: 'uppercase', color: '#dc2626' }}>Evolution History</span>
-                <button onClick={() => setShowVault(false)} style={{ color: '#71717a', backgroundColor: 'transparent', border: 'none', cursor: 'pointer' }}><XIcon size={20}/></button>
+                <span className="text-xs uppercase" style={{ fontWeight: '900', color: '#dc2626' }}>Evolution History (Vault)</span>
+                <button onClick={() => setShowVault(false)} style={{ color: '#71717a', backgroundColor: 'transparent', border: 'none', cursor: 'pointer' }}><X size={20}/></button>
               </div>
-              <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }} className="custom-scroll">
+              <div className="flex-1 custom-scroll" style={{ overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {vaultData.map(v => (
                   <div key={v.id} style={{ padding: '12px', backgroundColor: 'rgba(24, 24, 27, 0.5)', border: '1px solid #27272a', borderRadius: '4px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', marginBottom: '4px' }}>
-                      <span style={{ color: '#991b1b', fontWeight: 'bold' }}>CYCLE {v.cycle}</span>
-                      <span style={{ color: '#52525b' }}>{v.timestamp ? new Date(v.timestamp.seconds * 1000).toLocaleTimeString() : ''}</span>
+                      <span style={{ color: '#991b1b', fontWeight: 'bold' }}>CYCLE {v.cycle || 'N/A'}</span>
+                      <span style={{ color: '#52525b' }}>{v.timestamp ? new Date(v.timestamp.seconds * 1000).toLocaleTimeString() : 'N/A'}</span>
                     </div>
-                    <p style={{ fontSize: '10px', color: '#a1a1aa', fontStyle: 'italic' }}>{v.meta}</p>
+                    <p className="text-xs" style={{ color: '#a1a1aa', fontStyle: 'italic' }}>{v.meta || 'Log data unavailable.'}</p>
                   </div>
                 ))}
                 {vaultData.length === 0 && (
-                  <p style={{ fontSize: '10px', color: '#52525b', textAlign: 'center', padding: '20px' }}>
-                    No evolution history available. Firebase not configured.
+                  <p className="text-xs" style={{ color: '#52525b', textAlign: 'center', padding: '20px' }}>
+                    No history available. Firebase connectivity failed or database is empty.
                   </p>
                 )}
               </div>
