@@ -1,128 +1,363 @@
-# Dalek Linear Evolution - Recursive Commits v18
+class Logger {
+    constructor(uiElementId = 'log-output') {
+        this.logElement = document.getElementById(uiElementId) || console;
+        this.isConsole = (this.logElement === console);
+    }
 
-An autonomous code evolution system that iteratively improves codebases using AI-powered analysis and GitHub API integration.
+    _timestamp() {
+        return new Date().toLocaleTimeString('en-US', { hour12: false });
+    }
 
-## Features
+    log(message, type = 'INFO') {
+        const fullMessage = `[${this._timestamp()}] [${type}] ${message}`;
+        if (this.isConsole) {
+            console.log(fullMessage);
+        } else {
+            const line = document.createElement('div');
+            line.className = `log-line log-${type.toLowerCase()}`;
+            line.textContent = fullMessage;
+            this.logElement.prepend(line);
+            if (this.logElement.children.length > 50) {
+                this.logElement.lastChild.remove();
+            }
+        }
+    }
 
-- **Linear Evolution Cycles**: Runs through multiple refinement cycles to improve code quality
-- **AI-Powered Analysis**: Uses Google Gemini API for intelligent code analysis and generation
-- **GitHub Integration**: Automatically creates branches and commits improvements
-- **Real-Time Feedback**: Provides detailed logging of each evolution cycle
-- **Firebase Persistence**: Optionally stores evolution history in Firebase
+    error(message) {
+        this.log(message, 'ERROR');
+    }
 
-## How to Use
+    success(message) {
+        this.log(message, 'SUCCESS');
+    }
 
-1. **Open the Application**
-   - Visit: https://craighckby-stack.github.io/ai-scaffold/
-   - Or clone and run locally: open `index.html` in your browser
+    warn(message) {
+        this.log(message, 'WARN');
+    }
+}
 
-2. **Configure Your GitHub Token**
-   - Generate a Personal Access Token at https://github.com/settings/tokens
-   - Required permissions: `repo` (full control of private repositories)
-   - Enter the token in the application
+class GitHubClient {
+    constructor(token, owner, repo, logger) {
+        this.token = token;
+        this.owner = owner;
+        this.repo = repo;
+        this.baseURL = `https://api.github.com/repos/${owner}/${repo}`;
+        this.logger = logger;
 
-3. **Set Your Gemini API Key** (when prompted)
-   - Get your API key from https://makersuite.google.com/app/apikey
-   - The app will prompt for this when starting evolution
+        if (!this.token) {
+            this.logger.error("GitHub token is required.");
+            throw new Error("GitHub token not set.");
+        }
+    }
 
-4. **Start Linear Evolution**
-   - Click "Initiate 5-Cycle Evolution" (or 20-cycle in the full version)
-   - Watch as the system:
-     - Creates a new branch
-     - Scans current codebase
-     - Analyzes code with AI
-     - Generates improvements
-     - Commits changes to the branch
+    _fetch(endpoint, options = {}) {
+        const headers = {
+            'Authorization': `token ${this.token}`,
+            'Accept': 'application/vnd.github.v3+json',
+            'Content-Type': 'application/json',
+            ...options.headers
+        };
 
-## Architecture
+        return fetch(`${this.baseURL}${endpoint}`, {
+            ...options,
+            headers: headers
+        }).then(res => {
+            if (!res.ok) {
+                throw new Error(`GitHub API Error (${res.status}): ${res.url}`);
+            }
+            return res.json();
+        });
+    }
 
-```
-┌─────────────────────────────────────────────┐
-│         Dalek Linear Evolution            │
-└─────────────────────────────────────────────┘
-                    │
-                    ├─► GitHub API
-                    │   ├─ Create Branch
-                    │   ├─ Fetch Files
-                    │   ├─ Commit Changes
-                    │   └─ Read Repository
-                    │
-                    ├─► Gemini AI
-                    │   ├─ Analyze Code
-                    │   ├─ Identify Issues
-                    │   ├─ Generate Fixes
-                    │   └─ Optimize Architecture
-                    │
-                    └─► Firebase (Optional)
-                        ├─ Store Evolution History
-                        └─ Track Iterations
-```
+    async getReference(ref = 'heads/main') {
+        this.logger.log(`Fetching reference for ${ref}...`);
+        return this._fetch(`/git/ref/${ref}`);
+    }
 
-## Evolution Process
+    async createBranch(newBranchName, sha) {
+        this.logger.warn(`Creating new branch: ${newBranchName}`);
+        return this._fetch('/git/refs', {
+            method: 'POST',
+            body: JSON.stringify({
+                ref: `refs/heads/${newBranchName}`,
+                sha: sha
+            })
+        });
+    }
 
-Each cycle performs:
+    async getTree(sha, recursive = false) {
+        this.logger.log(`Fetching tree structure for SHA: ${sha.substring(0, 7)}`);
+        return this._fetch(`/git/trees/${sha}${recursive ? '?recursive=1' : ''}`);
+    }
 
-1. **Timeline Establishment**: Creates a dedicated branch for evolution
-2. **Code Scanning**: Reads and parses all project files
-3. **AI Analysis**: 
-   - Analyzes code structure
-   - Identifies bugs and issues
-   - Finds optimization opportunities
-4. **Refinement**: Generates improved code for each file
-5. **Commit**: Pushes changes to the evolution branch
-6. **Repeat**: Continues to next cycle
+    async getFileContent(filePath, branch) {
+        this.logger.log(`Reading file: ${filePath}`);
+        const data = await this._fetch(`/contents/${filePath}?ref=${branch}`);
+        
+        if (data.encoding !== 'base64') {
+             // Handle raw text/other encodings if necessary, but GitHub defaults to base64
+             return atob(data.content);
+        }
 
-## Configuration
+        return atob(data.content);
+    }
+    
+    async commitChanges(branchName, commitMessage, filesToUpdate) {
+        this.logger.log(`Preparing commit for ${filesToUpdate.length} files...`);
+        
+        const baseRef = await this.getReference(`heads/${branchName}`);
+        const baseCommitSha = baseRef.object.sha;
+        
+        // 1. Get the current tree
+        const baseCommit = await this._fetch(`/git/commits/${baseCommitSha}`);
+        const baseTreeSha = baseCommit.tree.sha;
 
-### Firebase Setup (Optional)
+        // 2. Create new blobs and tree entries
+        const newTreePromises = filesToUpdate.map(async file => {
+            const contentBase64 = btoa(unescape(encodeURIComponent(file.newContent)));
+            
+            // Create Blob
+            const blob = await this._fetch('/git/blobs', {
+                method: 'POST',
+                body: JSON.stringify({
+                    content: contentBase64,
+                    encoding: 'base64'
+                })
+            });
 
-To enable evolution history persistence:
+            return {
+                path: file.path,
+                mode: '100644', // File mode
+                type: 'blob',
+                sha: blob.sha
+            };
+        });
 
-```javascript
-firebase.initializeApp({
-  apiKey: "YOUR_FIREBASE_API_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID"
-});
-```
+        const treeEntries = await Promise.all(newTreePromises);
+        
+        // 3. Create the new Tree
+        const newTree = await this._fetch('/git/trees', {
+            method: 'POST',
+            body: JSON.stringify({
+                base_tree: baseTreeSha,
+                tree: treeEntries
+            })
+        });
 
-### Repository Structure
+        // 4. Create the new Commit
+        const newCommit = await this._fetch('/git/commits', {
+            method: 'POST',
+            body: JSON.stringify({
+                message: commitMessage,
+                tree: newTree.sha,
+                parents: [baseCommitSha]
+            })
+        });
 
-Ensure your repository is the target (set in code):
-- Owner: `craighckby-stack`
-- Name: `ai-scaffold`
+        // 5. Update the Branch Reference
+        await this._fetch(`/git/refs/heads/${branchName}`, {
+            method: 'PATCH',
+            body: JSON.stringify({
+                sha: newCommit.sha
+            })
+        });
 
-## Security Notes
+        this.logger.success(`Successfully pushed commit: ${newCommit.sha.substring(0, 7)}`);
+        return newCommit;
+    }
+}
 
-- **GitHub Token**: Never share or commit your token
-- **Firebase Config**: Keep Firebase config private
-- **API Keys**: Use environment variables for production
+class GeminiClient {
+    constructor(apiKey, model = 'gemini-2.5-pro', logger) {
+        this.apiKey = apiKey;
+        this.model = model;
+        this.logger = logger;
+        this.baseURL = `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent?key=${this.apiKey}`;
+        
+        if (!this.apiKey) {
+            this.logger.error("Gemini API key is required.");
+            throw new Error("Gemini API key not set.");
+        }
+    }
 
-## Browser Compatibility
+    async analyzeAndGenerateCode(codebaseStructure) {
+        this.logger.log("Sending codebase for AI analysis and refinement...");
 
-- Chrome/Edge 90+
-- Firefox 88+
-- Safari 14+
+        const systemInstruction = `You are the Dalek Linear Evolution System (v18). Your task is to analyze the provided JavaScript/HTML codebase structure, identify the single most critical or beneficial optimization/fix, and generate the *complete, improved contents* for *only* the files you intend to modify. 
+        Respond ONLY with a JSON array formatted exactly as follows: 
+        [{ "path": "path/to/file.js", "newContent": "The full, optimized content of the file..." }]
+        DO NOT include any files you are not modifying. Ensure the JSON is valid and complete.`;
 
-## License
+        const prompt = `Codebase Structure and Contents:\n\n${JSON.stringify(codebaseStructure, null, 2)}`;
+        
+        const response = await fetch(this.baseURL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                contents: [{ role: "user", parts: [{ text: prompt }] }],
+                config: {
+                    systemInstruction: systemInstruction,
+                    temperature: 0.1, // Ensure stable, reliable code output
+                    responseMimeType: "application/json"
+                }
+            })
+        });
 
-This project is part of the Dalek Khan AGI research initiative.
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Gemini API Error (${response.status}): ${errorText}`);
+        }
 
-## Contributing
+        const jsonResponse = await response.json();
+        
+        // The API returns the response wrapped in text
+        const generatedText = jsonResponse.candidates[0].content.parts[0].text.trim();
+        
+        try {
+            const updates = JSON.parse(generatedText);
+            this.logger.success(`AI returned ${updates.length} files for update.`);
+            return updates;
+        } catch (e) {
+            this.logger.error("Failed to parse AI output as JSON.");
+            throw new Error(`Invalid JSON structure received from AI: ${generatedText.substring(0, 200)}`);
+        }
+    }
+}
 
-Evolution is autonomous. Human intervention only required for:
-- Initial token configuration
-- Monitoring logs
-- Stopping if needed
+class EvolutionEngine {
+    constructor(config) {
+        this.config = {
+            OWNER: 'craighckby-stack',
+            REPO: 'ai-scaffold',
+            SOURCE_BRANCH: 'main',
+            ...config
+        };
+        this.logger = new Logger(this.config.LOG_ELEMENT_ID || 'log-output');
+        this.github = null;
+        this.gemini = null;
+    }
 
-## Version
+    async initialize() {
+        this.logger.log("Initializing Dalek Linear Evolution System v18...");
+        
+        const githubToken = this.config.GITHUB_TOKEN || prompt("Please enter your GitHub Personal Access Token:");
+        if (!githubToken) throw new Error("Initialization failed: GitHub Token missing.");
+        
+        const geminiKey = this.config.GEMINI_KEY || prompt("Please enter your Gemini API Key:");
+        if (!geminiKey) throw new Error("Initialization failed: Gemini Key missing.");
+        
+        this.github = new GitHubClient(githubToken, this.config.OWNER, this.config.REPO, this.logger);
+        this.gemini = new GeminiClient(geminiKey, this.config.MODEL, this.logger);
 
-**v18** - Linear Evolution System
-- Multi-cycle refinement
-- Real-time logging
-- Branch management
-- Firebase persistence
+        // Optional Firebase setup placeholder
+        if (typeof firebase !== 'undefined' && this.config.FIREBASE_CONFIG) {
+            try {
+                 firebase.initializeApp(this.config.FIREBASE_CONFIG);
+                 this.db = firebase.firestore();
+                 this.logger.log("Firebase persistence enabled.", 'SETUP');
+            } catch(e) {
+                 this.logger.warn("Firebase initialization failed. Continuing without persistence.");
+            }
+        }
 
----
+        this.logger.success("System initialized successfully.");
+    }
 
-**Built with ❤️ by Dalek Khan AGI**
+    async runEvolutionCycle(cycle = 1, totalCycles = 5) {
+        this.logger.log(`--- Starting Evolution Cycle ${cycle}/${totalCycles} ---`, 'CYCLE');
+
+        const evolutionBranch = `dalek-evolution-${Date.now()}`;
+        let baseRef, baseSha;
+        let fileContents = {};
+
+        try {
+            // 1. Timeline Establishment (Create Branch)
+            baseRef = await this.github.getReference(`heads/${this.config.SOURCE_BRANCH}`);
+            baseSha = baseRef.object.sha;
+            await this.github.createBranch(evolutionBranch, baseSha);
+            this.logger.success(`Evolution established on branch: ${evolutionBranch}`);
+
+            // 2. Code Scanning (Read codebase)
+            const treeData = await this.github.getTree(baseSha, true);
+            const filesToAnalyze = treeData.tree
+                .filter(item => item.type === 'blob' && !item.path.startsWith('.github') && !item.path.startsWith('node_modules'))
+                .map(item => item.path);
+
+            this.logger.log(`Found ${filesToAnalyze.length} files for analysis.`);
+
+            // Fetch contents in parallel
+            const fetchPromises = filesToAnalyze.map(async (path) => {
+                const content = await this.github.getFileContent(path, evolutionBranch);
+                fileContents[path] = content;
+            });
+            await Promise.all(fetchPromises);
+
+            // 3. AI Analysis & Refinement
+            const updates = await this.gemini.analyzeAndGenerateCode(fileContents);
+            
+            if (updates.length === 0) {
+                 this.logger.warn("AI returned no modifications. Ending evolution early.");
+                 return;
+            }
+
+            // 4. Commit Changes
+            const commitMessage = `# Dalek Linear Evolution - Recursive Commits v${this.config.VERSION || 18} (Cycle ${cycle})\nAutomated refinement targeting code stability and optimization.`;
+
+            await this.github.commitChanges(evolutionBranch, commitMessage, updates);
+
+            // 5. Repeat / Recursion
+            this.logger.success(`Cycle ${cycle} complete. Changes committed to ${evolutionBranch}.`);
+            
+            // Log persistence (Optional)
+            if (this.db) {
+                await this.db.collection("evolution_history").add({
+                    cycle,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    branch: evolutionBranch,
+                    changes: updates.map(u => u.path)
+                });
+            }
+
+
+            if (cycle < totalCycles) {
+                // Set the current evolution branch as the source for the next cycle
+                this.config.SOURCE_BRANCH = evolutionBranch; 
+                await this.runEvolutionCycle(cycle + 1, totalCycles);
+            } else {
+                this.logger.success(`--- Evolution Complete: ${totalCycles} Cycles Finalized. ---`, 'COMPLETE');
+                this.logger.log(`The final evolved branch is: ${evolutionBranch}`);
+            }
+
+        } catch (error) {
+            this.logger.error(`Evolution failed during Cycle ${cycle}: ${error.message}`);
+            this.logger.error("Please check configurations and API keys.");
+        }
+    }
+}
+
+// Example Initialization (Requires external configuration via index.html or global vars)
+/*
+async function startEvolution() {
+    const config = {
+        GITHUB_TOKEN: "YOUR_TOKEN_HERE",
+        GEMINI_KEY: "YOUR_KEY_HERE",
+        OWNER: 'craighckby-stack',
+        REPO: 'ai-scaffold',
+        VERSION: 18,
+        LOG_ELEMENT_ID: 'evolution-log-output',
+        // FIREBASE_CONFIG: { ... } // Uncomment and configure if using persistence
+    };
+    
+    const engine = new EvolutionEngine(config);
+    try {
+        await engine.initialize();
+        // Start with the configured SOURCE_BRANCH (e.g., 'main')
+        engine.runEvolutionCycle(1, 5); 
+    } catch (e) {
+        document.getElementById('evolution-log-output').innerHTML += `<div class="log-error">SETUP FAILURE: ${e.message}</div>`;
+    }
+}
+*/
+// startEvolution();
