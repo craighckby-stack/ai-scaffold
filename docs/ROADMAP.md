@@ -1,37 +1,37 @@
 # Roadmap
 
-## Current Version: v18.0.0
+## Current Version: v19.0.0
 
-## Planned Features
+## Planned Features: Focusing on Core Optimization and Scalability
 
-### Short Term (v18.1.0)
-- [ ] Add visual diff viewer for changes
-- [ ] Support for multiple repositories in single evolution
-- [ ] Add rollback capability
-- [ ] Improve error handling and recovery
+### Phase 1: Efficiency & Resilience (v19.1.0)
+* [ ] Implement optimized internal caching layer for dependency analysis and LLM response reuse (Significant performance gain).
+* [ ] Refactor core evolution engine for strict idempotency and atomic file writes, minimizing failure overhead.
+* [ ] Introduce multi-repository support in a single, unified evolution session (Workflow efficiency optimization).
+* [ ] Comprehensive rollback mechanism and detailed failure recovery pathways.
+* [ ] Add a high-fidelity visual diff viewer for transparent and faster change review.
 
-### Medium Term (v19.0.0)
-- [ ] Multi-AI provider support (OpenAI, Anthropic, etc.)
-- [ ] Advanced code metrics and visualization
-- [ ] Team collaboration features
-- [ ] Custom evolution strategies
-- [ ] Performance profiling integration
+### Phase 2: Performance & Scale (v20.0.0)
+* [ ] Integrate dedicated performance profiling hooks (e.g., PProf) into the core engine to identify bottlenecks.
+* [ ] Enable parallel processing of non-dependent file changes during the evolution phase (Horizontal scaling optimization).
+* [ ] Support for multiple AI providers (OpenAI, Anthropic, Gemini) allowing dynamic routing based on cost/latency metrics.
+* [ ] Advanced code metrics and visualization dashboard focusing on quantifiable optimization scores.
+* [ ] Introduction of Custom Goal-Oriented Strategies (allowing users to define and measure performance targets).
 
-### Long Term (v20.0.0)
-- [ ] Self-hosted AI model support
-- [ ] Continuous integration with GitHub Actions
-- [ ] Automated pull request creation
-- [ ] Code review AI assistant
-- [ ] Knowledge base integration
+### Phase 3: Automation & Ecosystem Integration (v21.0.0+)
+* [ ] Continuous evolution integration with GitHub Actions/GitLab CI.
+* [ ] Automated pull request generation based on successful, optimized evolution runs.
+* [ ] Support for self-hosted and fine-tuned AI models (Maximizing domain-specific optimization).
+* [ ] Integration with leading static analysis tools (e.g., SonarQube) for automated optimization scoring.
+* [ ] Code Review AI Assistant focused on maximizing structural efficiency and runtime performance.
 
-## Ideas Under Consideration
+## Ideas Under Consideration (Focusing on advanced optimization tooling)
 
-- Real-time collaborative evolution
-- Evolution templates and presets
-- Code quality scoring dashboard
-- Historical trend analysis
-- Custom AI fine-tuning
-- Integration with code quality tools (SonarQube, etc.)
+- Real-time performance impact visualization during evolution cycles.
+- Dynamic workload distribution and resource management for extremely large codebases.
+- Predictive optimization modeling (suggesting ideal, most efficient evolution pathways).
+- Evolution templates and presets focusing on specific optimization tasks (e.g., latency reduction).
+- Detailed historical trend analysis focusing on optimization metrics.
 
 ## Contribution
 
