@@ -1,12 +1,7 @@
-# Security Policy Contact
-Contact: security@example.com
-Expires: 2026-12-31T23:59:59.999Z
+Contact: mailto:security@example.com
+Expires: 2026-12-31T23:59:59Z
 Preferred-Languages: en, es
-Canonical: https://github.com/craighckby-stack/ai-scaffold/security.md
 Policy: https://github.com/craighckby-stack/ai-scaffold/security.md
+Canonical: https://github.com/craighckby-stack/ai-scaffold/security.md
+Encryption: https://github.com/craighckby-stack/ai-scaffold/pgp-key.txt
 Acknowledgments: https://github.com/craighckby-stack/ai-scaffold/blob/main/AUTHORS
-Encryption: https://github.com/craighckby-stack/ai-scaffold
-Hiring: https://github.com/craighckby-stack/ai-scaffold/blob/main/AUTHORS
-
-# Security.txt standard 1.0
-# See https://securitytxt.org/
