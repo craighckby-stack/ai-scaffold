@@ -1,3 +1,1 @@
-This is a placeholder for icon-192.png
-Replace with actual PNG image file for PWA icon.
-Recommended size: 192x192 pixels
+PWA Icon 192x192 Placeholder - Replace this file with binary PNG data.
