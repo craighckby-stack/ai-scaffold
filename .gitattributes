@@ -1,22 +1,13 @@
-# Auto detect text files
+# Default handling: auto-detect text files
 * text=auto
 
-# Force text files
-*.html text eol=lf
-*.css text eol=lf
-*.js text eol=lf
-*.json text eol=lf
-*.md text eol=lf
+# Force LF endings for common source/documentation files
+*.{html,css,js,json,md} text eol=lf
 
-# Force binary
-*.png binary
-*.jpg binary
-*.jpeg binary
-*.gif binary
-*.ico binary
-*.pdf binary
-*.zip binary
+# Force binary handling (images, documents, archives)
+*.{png,jpg,jpeg,gif,ico} binary
+*.{pdf,zip} binary
 *.tar.gz binary
 
-# macOS
-__MACOSX/ -text
+# Ignore macOS resource forks
+__MACOSX/ binary
