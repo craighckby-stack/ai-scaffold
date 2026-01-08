@@ -1,4 +1,20 @@
-.PHONY: help start dev test lint validate clean deploy
+```makefile
+# --- Configuration ---
+
+# Use .ONESHELL to slightly optimize shell invocations for multi-line recipes,
+# though we prioritize standard Make for portability unless complex logic is needed.
+# .ONESHELL:
+
+.PHONY: help start dev test lint validate clean deploy install setup
+
+# Define common commands and paths using variables for easy maintenance and replacement
+PYTHON := python
+NODE := node
+RM := rm -rf
+SHELL := /bin/bash
+CLEAN_DIRS := node_modules/ dist/ .cache/ coverage/
+
+# --- Standard Targets ---
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -7,38 +23,36 @@ help: ## Show this help message
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?##/ {printf "  %-15s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 start: ## Start development server
-	@echo "Starting development server..."
-	@python -m http.server 8000
+	@echo "Starting development server on http://localhost:8000"
+	@$(PYTHON) -m http.server 8000
 
 dev: start ## Alias for start
 
 test: ## Run tests
 	@echo "Running tests..."
-	@bash scripts/test.sh
+	@$(SHELL) scripts/test.sh
 
 lint: ## Run linter
-	@echo "Running linter..."
-	@echo "No linter configured"
+	@echo "No linter configured. Skipping validation."
+	@: # No-op command to ensure success while being silent
 
-validate: ## Validate code
+validate: ## Validate code structure
 	@echo "Validating code..."
-	@node tools/validate.js
+	@$(NODE) tools/validate.js
 
-clean: ## Remove build artifacts
-	@echo "Cleaning..."
-	@rm -rf node_modules/
-	@rm -rf dist/
-	@rm -rf .cache/
-	@rm -rf coverage/
+clean: ## Remove build artifacts (Optimized: combined RM operations)
+	@echo "Cleaning artifacts: $(CLEAN_DIRS)"
+	@$(RM) $(CLEAN_DIRS)
 
 deploy: ## Deploy to GitHub Pages
 	@echo "Deploying to GitHub Pages..."
-	@bash scripts/deploy.sh
+	@$(SHELL) scripts/deploy.sh
 
-install: ## Install dependencies
+install: ## Install dependencies (npm/yarn/pnpm fallback)
 	@echo "Installing dependencies..."
 	@npm install || yarn install || pnpm install
 
-setup: ## Setup project
-	@echo "Setting up project..."
-	@bash scripts/setup.sh
+setup: install ## Setup project (install dependencies, then run setup script)
+	@echo "Running project setup script..."
+	@$(SHELL) scripts/setup.sh
+```
